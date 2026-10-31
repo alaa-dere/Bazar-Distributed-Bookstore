@@ -62,11 +62,9 @@ Python does not need to be installed locally when running the project through Do
 ### 1. Clone the Repository
 
 ```bash
-git clone <REPOSITORY_URL>
+git clone https://github.com/alaa-dere/Bazar-Distributed-Bookstore.git
 cd Bazar-Distributed-Bookstore
 ```
-
-Replace `<REPOSITORY_URL>` with the actual GitHub repository URL.
 
 ### 2. Build and Start the Services
 
