@@ -2,12 +2,20 @@
 import os
 from flask import Flask, jsonify
 
+from catalog_routes import catalog_blueprint
+
 app = Flask(__name__)
+
+# Register Catalog-related frontend routes.
+app.register_blueprint(catalog_blueprint)
 
 
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"service": "frontend","status": "running"}), 200
+    return jsonify({
+        "service": "frontend",
+        "status": "running"
+    }), 200
 
 
 if __name__ == "__main__":
