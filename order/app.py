@@ -28,13 +28,14 @@ class CatalogUnavailable(Exception):
     """Raised when the Catalog Service cannot be reached."""
 
 
-def call_catalog(method, endpoint):
+def call_catalog(method, endpoint, body=None):
     """
     Send a request to the Catalog Service.
 
     Args:
         method: HTTP method, e.g. "GET" or "POST".
         endpoint: Catalog path, e.g. "/info/2".
+        body: Optional JSON body for the request.
 
     Returns:
         tuple: (status code, JSON body).
@@ -45,7 +46,9 @@ def call_catalog(method, endpoint):
     url = f"{CATALOG_URL}{endpoint}"
 
     try:
-        response = requests.request(method, url, timeout=CATALOG_TIMEOUT)
+        response = requests.request(
+            method, url, json=body, timeout=CATALOG_TIMEOUT
+        )
         return response.status_code, response.json()
 
     except requests.Timeout as error:
@@ -83,6 +86,37 @@ def record_order(item_id, title):
         return cursor.lastrowid
 
 
+def restore_stock(item_id):
+    """
+    Give one copy back to the catalog with PUT /update/<id>.
+
+    Args:
+        item_id: ID of the book.
+
+    Returns:
+        bool: True if the catalog accepted the update, False otherwise.
+    """
+    try:
+        status, _ = call_catalog(
+            "PUT", f"/update/{item_id}", {"quantity_delta": 1}
+        )
+    except CatalogUnavailable:
+        status = None
+
+    if status == 200:
+        print(f"[ORDER] Restored one copy of book {item_id}", flush=True)
+        return True
+
+    # Here the stock stays one lower than it should be, so the log
+    # message is the only way to find and fix it by hand.
+    print(
+        f"[ORDER] ERROR: could not restore stock for book {item_id} "
+        f"(catalog status {status})",
+        flush=True
+    )
+    return False
+
+
 @app.route("/health", methods=["GET"])
 def health():
     """
@@ -109,7 +143,7 @@ def purchase(item_id):
         200: {"message", "book_id", "title", "status"} on success.
         404: book not found.
         409: book out of stock.
-        500: order could not be saved.
+        500: order could not be saved (the copy is given back).
         503: catalog is down, timed out, or gave a bad reply.
     """
     print(f"[ORDER] Purchase request for book {item_id}", flush=True)
@@ -173,6 +207,12 @@ def purchase(item_id):
     except sqlite3.Error:
         app.logger.exception("Order could not be recorded")
         print(f"[ORDER] Failed to record order for book {item_id}", flush=True)
+
+        # The copy was already taken from the catalog, but there is no
+        # order for it. We give the copy back so the stock and the order
+        # log stay in sync.
+        restore_stock(item_id)
+
         return jsonify({"error": "Order could not be recorded"}), 500
 
     print(f"[ORDER] bought book {title} (order {order_id})", flush=True)
