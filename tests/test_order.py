@@ -11,6 +11,8 @@ import os
 import sqlite3
 import sys
 import tempfile
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -249,3 +251,44 @@ def test_stock_restored_when_order_not_saved(
     # The copy was decremented and then given back.
     assert catalog_client.get("/info/2").get_json()["quantity"] == 5
     assert count_orders(order_db_path) == 0
+
+
+def test_concurrent_purchase_last_copy(
+    catalog_client, order_db_path, monkeypatch
+):
+    """Two buyers try to buy the last copy at the same time; only one wins."""
+    catalog_client.put("/update/2", json={"quantity_delta": -4})
+
+    # Both buyers wait here after reading the stock. This way both see
+    # one copy left, and the catalog's decrement has to pick the winner.
+    both_checked = threading.Barrier(2, timeout=5)
+
+    def racing_request(method, url, json=None, timeout=None):
+        endpoint = url[len(order_app.CATALOG_URL):]
+
+        # A Flask test client is not thread safe, so each call gets its own.
+        reply = catalog_app.app.test_client().open(
+            endpoint, method=method, json=json
+        )
+
+        if method == "GET":
+            both_checked.wait()
+
+        response = Mock()
+        response.status_code = reply.status_code
+        response.json.return_value = reply.get_json()
+        return response
+
+    monkeypatch.setattr(order_app.requests, "request", racing_request)
+    order_app.app.config["TESTING"] = True
+
+    def buy(_):
+        """Send one purchase request and return its status code."""
+        return order_app.app.test_client().post("/purchase/2").status_code
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(buy, range(2)))
+
+    assert sorted(results) == [200, 409]
+    assert catalog_client.get("/info/2").get_json()["quantity"] == 0
+    assert count_orders(order_db_path) == 1
