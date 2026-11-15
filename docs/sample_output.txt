@@ -1,0 +1,196 @@
+Bazar.com - Sample Output
+=========================
+
+The three services were started with "docker compose up --build -d"
+using fresh databases (5 copies of each book). The client ran on the
+host against the frontend at http://localhost:5000.
+
+Scenario:
+  1. search both topics
+  2. info for book 2 and for a book that does not exist (99)
+  3. buy book 2 five times (all 5 copies)
+  4. buy book 2 once more (out of stock)
+  5. info for book 2 again (stock is 0)
+  6. buy a book that does not exist (99)
+
+
+1. Client output
+----------------
+
+$ python client/client.py search "distributed systems"
+[CLIENT] GET http://localhost:5000/search/distributed%20systems
+[CLIENT] Response status: 200
+------------------------------------------------------------
+Search results for 'distributed systems'
+------------------------------------------------------------
+ID   Title
+1    How to get a good grade in DOS in 40 minutes a day
+2    RPCs for Noobs
+------------------------------------------------------------
+
+$ python client/client.py search "undergraduate school"
+[CLIENT] GET http://localhost:5000/search/undergraduate%20school
+[CLIENT] Response status: 200
+------------------------------------------------------------
+Search results for 'undergraduate school'
+------------------------------------------------------------
+ID   Title
+3    Xen and the Art of Surviving Undergraduate School
+4    Cooking for the Impatient Undergrad
+------------------------------------------------------------
+
+$ python client/client.py info 2
+[CLIENT] GET http://localhost:5000/info/2
+[CLIENT] Response status: 200
+------------------------------------------------------------
+Book 2
+------------------------------------------------------------
+Title    : RPCs for Noobs
+Price    : $50.00
+In stock : 5
+------------------------------------------------------------
+
+$ python client/client.py info 99
+[CLIENT] GET http://localhost:5000/info/99
+[CLIENT] Response status: 404
+------------------------------------------------------------
+Book 99
+------------------------------------------------------------
+Error (404): Book not found
+------------------------------------------------------------
+
+$ python client/client.py purchase 2
+[CLIENT] POST http://localhost:5000/purchase/2
+[CLIENT] Response status: 200
+------------------------------------------------------------
+Purchase book 2
+------------------------------------------------------------
+bought book RPCs for Noobs
+------------------------------------------------------------
+
+$ python client/client.py purchase 2
+[CLIENT] POST http://localhost:5000/purchase/2
+[CLIENT] Response status: 200
+------------------------------------------------------------
+Purchase book 2
+------------------------------------------------------------
+bought book RPCs for Noobs
+------------------------------------------------------------
+
+$ python client/client.py purchase 2
+[CLIENT] POST http://localhost:5000/purchase/2
+[CLIENT] Response status: 200
+------------------------------------------------------------
+Purchase book 2
+------------------------------------------------------------
+bought book RPCs for Noobs
+------------------------------------------------------------
+
+$ python client/client.py purchase 2
+[CLIENT] POST http://localhost:5000/purchase/2
+[CLIENT] Response status: 200
+------------------------------------------------------------
+Purchase book 2
+------------------------------------------------------------
+bought book RPCs for Noobs
+------------------------------------------------------------
+
+$ python client/client.py purchase 2
+[CLIENT] POST http://localhost:5000/purchase/2
+[CLIENT] Response status: 200
+------------------------------------------------------------
+Purchase book 2
+------------------------------------------------------------
+bought book RPCs for Noobs
+------------------------------------------------------------
+
+$ python client/client.py purchase 2
+[CLIENT] POST http://localhost:5000/purchase/2
+[CLIENT] Response status: 409
+------------------------------------------------------------
+Purchase book 2
+------------------------------------------------------------
+Error (409): Out of stock
+------------------------------------------------------------
+
+$ python client/client.py info 2
+[CLIENT] GET http://localhost:5000/info/2
+[CLIENT] Response status: 200
+------------------------------------------------------------
+Book 2
+------------------------------------------------------------
+Title    : RPCs for Noobs
+Price    : $50.00
+In stock : 0
+------------------------------------------------------------
+
+$ python client/client.py purchase 99
+[CLIENT] POST http://localhost:5000/purchase/99
+[CLIENT] Response status: 404
+------------------------------------------------------------
+Purchase book 99
+------------------------------------------------------------
+Error (404): Book not found
+------------------------------------------------------------
+
+
+2. Service logs
+---------------
+Taken with "docker compose logs <service>". Only the lines with the
+service prefix are shown (Flask access logs and health checks removed).
+
+== frontend ==
+[FRONTEND] Searching for topic: distributed systems
+[FRONTEND] Searching for topic: undergraduate school
+[FRONTEND] Requesting book info: 2
+[FRONTEND] Requesting book info: 99
+[FRONTEND] Purchase request for book 2
+[FRONTEND] Order service replied 200
+[FRONTEND] Purchase request for book 2
+[FRONTEND] Order service replied 200
+[FRONTEND] Purchase request for book 2
+[FRONTEND] Order service replied 200
+[FRONTEND] Purchase request for book 2
+[FRONTEND] Order service replied 200
+[FRONTEND] Purchase request for book 2
+[FRONTEND] Order service replied 200
+[FRONTEND] Purchase request for book 2
+[FRONTEND] Order service replied 409
+[FRONTEND] Requesting book info: 2
+[FRONTEND] Purchase request for book 99
+[FRONTEND] Order service replied 404
+== order ==
+[ORDER] Database initialized successfully.
+[ORDER] Purchase request for book 2
+[ORDER] bought book RPCs for Noobs (order 1)
+[ORDER] Purchase request for book 2
+[ORDER] bought book RPCs for Noobs (order 2)
+[ORDER] Purchase request for book 2
+[ORDER] bought book RPCs for Noobs (order 3)
+[ORDER] Purchase request for book 2
+[ORDER] bought book RPCs for Noobs (order 4)
+[ORDER] Purchase request for book 2
+[ORDER] bought book RPCs for Noobs (order 5)
+[ORDER] Purchase request for book 2
+[ORDER] Book 2 out of stock
+[ORDER] Purchase request for book 99
+[ORDER] Book 99 not found
+== catalog ==
+[CATALOG] Database initialized successfully.
+[CATALOG] Search topic: distributed systems | Results: 2
+[CATALOG] Search topic: undergraduate school | Results: 2
+[CATALOG] Info requested for book 2
+[CATALOG] Book 99 not found
+[CATALOG] Info requested for book 2
+[CATALOG] Stock decremented for book 2 | Remaining: 4
+[CATALOG] Info requested for book 2
+[CATALOG] Stock decremented for book 2 | Remaining: 3
+[CATALOG] Info requested for book 2
+[CATALOG] Stock decremented for book 2 | Remaining: 2
+[CATALOG] Info requested for book 2
+[CATALOG] Stock decremented for book 2 | Remaining: 1
+[CATALOG] Info requested for book 2
+[CATALOG] Stock decremented for book 2 | Remaining: 0
+[CATALOG] Info requested for book 2
+[CATALOG] Info requested for book 2
+[CATALOG] Book 99 not found
