@@ -3,11 +3,13 @@ import os
 from flask import Flask, jsonify
 
 from catalog_routes import catalog_blueprint
+from order_routes import order_blueprint
 
 app = Flask(__name__)
 
 # Register Catalog-related frontend routes.
 app.register_blueprint(catalog_blueprint)
+app.register_blueprint(order_blueprint)
 
 
 @app.route("/health", methods=["GET"])
